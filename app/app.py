@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import torch
-import torch.nn.functional as F
+import torch.nn.functional afs F
 import joblib
 import plotly.graph_objects as go
 import plotly.express as px
@@ -60,22 +60,45 @@ class GeneGAT(torch.nn.Module):
 # =====================================================
 # DATA & MODEL LOADING
 # =====================================================
-@st.cache_data
-def load_datasets():
-    features_df = pd.read_csv("../data/processed/final_gene_features.csv")
+@st.cache_resource
+def load_models():
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    root_dir = os.path.dirname(current_dir)
+    models_dir = os.path.join(root_dir, "models")
     
-    edge_path = "../data/processed/string_interactions.csv"
-    if not os.path.exists(edge_path):
-        edge_path = "../data/processed/final_edge_list.csv"
-    edges_df = pd.read_csv(edge_path)
+    # Load Scaler
+    scaler = joblib.load(os.path.join(models_dir, "feature_scaler.pkl"))
     
-    if 'pathogenic' not in features_df.columns and 'label' in features_df.columns:
-        features_df['pathogenic'] = features_df['label']
-    elif 'pathogenic' not in features_df.columns:
-        features_df['pathogenic'] = (features_df['total_variants'] > features_df['total_variants'].median()).astype(int)
-        
-    return features_df, edges_df
+    # Load ML Models
+    ml_models = {}
+    model_files = {
+        "RandomForest": "random_forest.pkl",
+        "XGBoost": "xgboost.pkl",
+        "GradientBoost": "gradient_boost.pkl",
+        "SVM": "svm.pkl",
+        "LogisticRegression": "logistic_regression.pkl",
+        "StackingEnsemble": "stacking_ensemble.pkl"
+    }
+    
+    for name, filename in model_files.items():
+        path = os.path.join(models_dir, filename)
+        if os.path.exists(path):
+            ml_models[name] = joblib.load(path)
+            
+    # Load GNNs
+    sage_model = GeneSAGE(input_dim=38).to(device)
+    sage_path = os.path.join(models_dir, "gene_gnn_model.pt")
+    if os.path.exists(sage_path):
+        sage_model.load_state_dict(torch.load(sage_path, map_location=device))
+    sage_model.eval()
 
+    gat_model = GeneGAT(input_dim=38, hidden_dim=128, heads=8).to(device)
+    gat_path = os.path.join(models_dir, "gene_gat_model.pt")
+    if os.path.exists(gat_path):
+        gat_model.load_state_dict(torch.load(gat_path, map_location=device))
+    gat_model.eval()
+    
+    return ml_models, scaler, sage_model, gat_model
 @st.cache_resource
 def load_models():
     models_dir = "../models"
