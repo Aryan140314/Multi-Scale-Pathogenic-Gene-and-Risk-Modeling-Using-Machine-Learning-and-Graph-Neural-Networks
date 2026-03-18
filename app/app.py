@@ -15,15 +15,13 @@ import os
 from torch_geometric.nn import SAGEConv, GATv2Conv
 from torch_geometric.data import Data
 
-# Setup Device globally (Uses NVIDIA GPU if available, else CPU)
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+# Setup Device globally
+device = torch.device('cpu') 
 
 # =====================================================
-# PAGE CONFIG & STYLES
+# PATH HELPER (Solves FileNotFoundError on Cloud)
 # =====================================================
-st.set_page_config(layout="wide", page_title="PathoGAT AI Dashboard", page_icon="🧬")
-st.title("🧬 PathoGAT: Multi-Scale Gene Pathogenicity Predictor")
-st.markdown(f"Integrates a 5-Model ML Ensemble, GraphSAGE, and Graph Attention Networks (GAT). **Compute Engine: `{device}`**")
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # =====================================================
 # GNN MODEL CLASSES (SAGE & GAT)
@@ -60,11 +58,35 @@ class GeneGAT(torch.nn.Module):
 # =====================================================
 # DATA & MODEL LOADING
 # =====================================================
+@st.cache_data
+def load_datasets():
+    features_path = os.path.join(BASE_DIR, "data", "processed", "final_gene_features.csv")
+    features_df = pd.read_csv(features_path)
+    
+    # Try multiple common names for the edges file
+    edge_filenames = ["string_interactions.csv", "final_edge_list.csv", "string_interactions_short.csv"]
+    edges_df = None
+    
+    for fname in edge_filenames:
+        path = os.path.join(BASE_DIR, "data", "processed", fname)
+        if os.path.exists(path):
+            edges_df = pd.read_csv(path)
+            break
+            
+    if edges_df is None:
+        st.error("Could not find the interaction edges CSV file in data/processed/")
+        st.stop()
+        
+    if 'pathogenic' not in features_df.columns and 'label' in features_df.columns:
+        features_df['pathogenic'] = features_df['label']
+    elif 'pathogenic' not in features_df.columns:
+        features_df['pathogenic'] = (features_df['total_variants'] > features_df['total_variants'].median()).astype(int)
+        
+    return features_df, edges_df
+
 @st.cache_resource
 def load_models():
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    root_dir = os.path.dirname(current_dir)
-    models_dir = os.path.join(root_dir, "models")
+    models_dir = os.path.join(BASE_DIR, "models")
     
     # Load Scaler
     scaler = joblib.load(os.path.join(models_dir, "feature_scaler.pkl"))
@@ -99,39 +121,10 @@ def load_models():
     gat_model.eval()
     
     return ml_models, scaler, sage_model, gat_model
-@st.cache_resource
-def load_models():
-    models_dir = "../models"
-    models = {}
-    model_files = {
-        "RandomForest": "random_forest.pkl",
-        "XGBoost": "xgboost.pkl",
-        "GradientBoost": "gradient_boost.pkl",
-        "SVM": "svm.pkl",
-        "LogisticRegression": "logistic_regression.pkl",
-        "StackingEnsemble": "stacking_ensemble.pkl"
-    }
-    
-    for name, filename in model_files.items():
-        path = os.path.join(models_dir, filename)
-        if os.path.exists(path):
-            models[name] = joblib.load(path)
-            
-    scaler = joblib.load(os.path.join(models_dir, "feature_scaler.pkl"))
-    
-    sage_model = GeneSAGE(input_dim=38).to(device)
-    sage_path = os.path.join(models_dir, "gene_gnn_model.pt")
-    if os.path.exists(sage_path):
-        sage_model.load_state_dict(torch.load(sage_path, map_location=device))
-    sage_model.eval()
 
-    gat_model = GeneGAT(input_dim=38, hidden_dim=128, heads=8).to(device)
-    gat_path = os.path.join(models_dir, "gene_gat_model.pt")
-    if os.path.exists(gat_path):
-        gat_model.load_state_dict(torch.load(gat_path, map_location=device))
-    gat_model.eval()
-    
-    return models, scaler, sage_model, gat_model
+# INITIALIZE
+st.set_page_config(layout="wide", page_title="PathoGAT AI Dashboard", page_icon="🧬")
+st.title("🧬 PathoGAT: Multi-Scale Gene Pathogenicity Predictor")
 
 features_df, edges_df = load_datasets()
 ml_models, scaler, sage_model, gat_model = load_models()
@@ -178,7 +171,6 @@ selected_idx = gene_to_idx[selected_gene]
 
 st.sidebar.markdown("---")
 st.sidebar.header("✏️ Edit Features dynamically")
-st.sidebar.caption("Add more features to edit and see how the model reacts!")
 
 available_numeric_features = sorted([col for col in rf_cols if pd.api.types.is_numeric_dtype(features_df[col])])
 default_edits = [f for f in ["total_variants", "benign_variants", "rare_variants", "gene_degree", "clustering_coefficient"] if f in available_numeric_features]
@@ -200,8 +192,6 @@ for feat, val in user_inputs.items():
 
 X_in_df = pd.DataFrame([node_raw_features], columns=rf_cols)
 X_in_scaled = scaler.transform(X_in_df)
-
-# FIX: Wrap the scaled array back into a DataFrame to silence sklearn warnings
 X_in_scaled_df = pd.DataFrame(X_in_scaled, columns=rf_cols)
 
 individual_ml_probs = {}
@@ -217,7 +207,6 @@ ml_ensemble_prob = ml_models["StackingEnsemble"].predict_proba(X_in_scaled_df)[0
 X_gnn_scaled_live = X_gnn_scaled.copy()
 X_gnn_scaled_live[selected_idx] = X_in_scaled[0, gnn_indices]
 
-# Run GNN Inference on GPU
 with torch.no_grad():
     graph_data = Data(x=torch.tensor(X_gnn_scaled_live, dtype=torch.float), edge_index=edge_index).to(device)
     
@@ -239,7 +228,6 @@ m_col2.metric("📊 ML Stacking Ensemble", f"{ml_ensemble_prob:.3f}")
 m_col3.metric("🕸️ GNN Consensus", f"{gnn_ensemble_prob:.3f}")
 
 st.markdown("---")
-
 st.markdown("### 🤖 Individual Model Predictions")
 i_cols = st.columns(len(individual_ml_probs) + 2)
 for idx, (m_name, m_prob) in enumerate(individual_ml_probs.items()):
@@ -248,7 +236,6 @@ i_cols[-2].metric("GraphSAGE", f"{sage_prob:.3f}")
 i_cols[-1].metric("PathoGAT (GAT)", f"{gat_prob:.3f}")
 
 st.markdown("---")
-
 col_left, col_right = st.columns(2)
 with col_left:
     st.subheader("🎯 Risk Gauge")
@@ -258,30 +245,20 @@ with col_left:
 
 with col_right:
     st.subheader("📊 All Models Comparison")
-    
     all_names = list(individual_ml_probs.keys()) + ["ML Ensemble", "GraphSAGE", "PathoGAT", "GNN Consensus", "FINAL CONSENSUS"]
     all_probs = list(individual_ml_probs.values()) + [ml_ensemble_prob, sage_prob, gat_prob, gnn_ensemble_prob, final_ensemble_prob]
-    
     colors = ['#1f77b4']*len(individual_ml_probs) + ['#ff7f0e', '#9467bd', '#9467bd', '#f1c40f', '#00fa9a' if final_ensemble_prob < 0.5 else '#ff4b4b']
     
     all_names.reverse()
     all_probs.reverse()
     colors.reverse()
     
-    fig_bar = go.Figure(go.Bar(
-        x=all_probs,
-        y=all_names,
-        orientation='h',
-        marker_color=colors,
-        text=[f"{p:.3f}" for p in all_probs],
-        textposition='auto'
-    ))
+    fig_bar = go.Figure(go.Bar(x=all_probs, y=all_names, orientation='h', marker_color=colors, text=[f"{p:.3f}" for p in all_probs], textposition='auto'))
     fig_bar.add_vline(x=0.5, line_dash="dash", line_color="red", annotation_text="Pathogenic Cutoff")
     fig_bar.update_layout(xaxis=dict(range=[0, 1]), height=400, margin=dict(l=0, r=0, t=30, b=0))
     st.plotly_chart(fig_bar, width='stretch')
 
 st.markdown("---")
-
 dist_col1, dist_col2 = st.columns(2)
 with dist_col1:
     st.subheader("🧪 Feature Population Analysis")
@@ -290,8 +267,6 @@ with dist_col1:
         fig_dist = px.histogram(features_df, x=feat_to_plot, nbins=50, title=f"Global {feat_to_plot} Distribution")
         fig_dist.add_vline(x=user_inputs[feat_to_plot], line_dash="dash", line_color="red", annotation_text="Selected Gene")
         st.plotly_chart(fig_dist, width='stretch')
-    else:
-        st.info("Select features in the sidebar to see distributions.")
 
 with dist_col2:
     st.subheader("🔬 Feature Sensitivity Analysis")
@@ -303,13 +278,11 @@ with dist_col2:
             t_row = node_raw_features.copy()
             t_row[rf_cols.index(feature_sens)] = v
             t_row_scaled_df = pd.DataFrame(scaler.transform(pd.DataFrame([t_row], columns=rf_cols)), columns=rf_cols)
-            
             model_to_test = ml_models.get("XGBoost", list(ml_models.values())[0])
             if hasattr(model_to_test, 'predict_proba'):
                 sens_probs.append(model_to_test.predict_proba(t_row_scaled_df)[0][1])
             else:
                 sens_probs.append(1 / (1 + np.exp(-model_to_test.decision_function(t_row_scaled_df)[0])))
-        
         fig_sens = px.line(x=test_range, y=sens_probs, labels={'x': feature_sens, 'y': 'Pathogenicity Risk'})
         st.plotly_chart(fig_sens, width='stretch')
 
@@ -319,41 +292,25 @@ theme = st.radio("Network Theme", ["Dark", "Light"], horizontal=True)
 bg_color = "#0e1117" if theme == "Dark" else "#ffffff"
 text_color = "white" if theme == "Dark" else "black"
 
-col_n1, col_n2, col_n3 = st.columns(3)
-interaction_limit = col_n1.slider("Max interactions", 10, 150, 60)
-enable_physics = col_n2.toggle("Physics", True)
-show_stats = col_n3.toggle("Stats", True)
-
-local_edges = edges_df[(edges_df["gene1"] == selected_gene) | (edges_df["gene2"] == selected_gene)].head(interaction_limit)
+local_edges = edges_df[(edges_df["gene1"] == selected_gene) | (edges_df["gene2"] == selected_gene)].head(60)
 
 if not local_edges.empty:
     net = Network(height="600px", width="100%", bgcolor=bg_color, font_color=text_color, notebook=False)
-    if enable_physics: net.barnes_hut(gravity=-8000, spring_length=200)
+    net.barnes_hut(gravity=-8000, spring_length=200)
     net.set_edge_smooth("dynamic")
-    
     genes_in_network = set(local_edges['gene1']).union(set(local_edges['gene2']))
-    if show_stats:
-        s1, s2 = st.columns(2)
-        s1.metric("Nodes", len(genes_in_network))
-        s2.metric("Edges", len(local_edges))
-
     for gene in genes_in_network:
         net.add_node(gene, label=gene, color="#ff4b4b" if gene == selected_gene else "#1f77b4", size=40 if gene == selected_gene else 20)
     for _, r in local_edges.iterrows():
         net.add_edge(r['gene1'], r['gene2'], color="#888888")
-
     with tempfile.NamedTemporaryFile(delete=False, suffix=".html") as tmp:
         net.save_graph(tmp.name)
         components.html(open(tmp.name, 'r', encoding='utf-8').read(), height=615)
-else:
-    st.info("No interactions found for this gene in the dataset.")
 
 st.markdown("---")
 st.subheader("🧠 Node2Vec Global Embedding Space")
 if "node2vec_0" in features_df.columns:
     sample = features_df.sample(min(800, len(features_df)))
-    fig_embed = px.scatter(sample, x="node2vec_0", y="node2vec_1", color="pathogenic", opacity=0.4, title="Global Gene Clusters")
-    fig_embed.add_trace(go.Scatter(x=[features_df.iloc[selected_idx]["node2vec_0"]], y=[features_df.iloc[selected_idx]["node2vec_1"]], mode='markers', marker=dict(size=15, color="red", symbol="star"), name="Selected Gene"))
+    fig_embed = px.scatter(sample, x="node2vec_0", y="node2vec_1", color="pathogenic", opacity=0.4)
+    fig_embed.add_trace(go.Scatter(x=[features_df.iloc[selected_idx]["node2vec_0"]], y=[features_df.iloc[selected_idx]["node2vec_1"]], mode='markers', marker=dict(size=15, color="red", symbol="star")))
     st.plotly_chart(fig_embed, width='stretch')
-else:
-    st.info("Node2Vec features not found in dataset. Ensure columns are named 'node2vec_0' and 'node2vec_1'.")
