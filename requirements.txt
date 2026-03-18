@@ -1,0 +1,11 @@
+streamlit
+pandas
+numpy
+scikit-learn
+xgboost
+joblib
+plotly
+shap
+pyvis
+torch --index-url https://download.pytorch.org/whl/cpu
+torch_geometric

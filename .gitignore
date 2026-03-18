@@ -1,0 +1,12 @@
+# Environments
+.venv/
+env/
+venv/
+
+# Caches
+__pycache__/
+*.pyc
+.vscode/
+
+# Ignore raw data (too big, app only needs processed)
+data/raw/
