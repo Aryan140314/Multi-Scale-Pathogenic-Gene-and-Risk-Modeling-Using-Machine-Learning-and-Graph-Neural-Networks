@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import torch
-import torch.nn.functional afs F
+import torch.nn.functional as F
 import joblib
 import plotly.graph_objects as go
 import plotly.express as px
