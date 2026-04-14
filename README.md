@@ -83,59 +83,71 @@ Based on our robust evaluation suite:
 ├── .gitignore
 └── requirements.txt       # Project dependencies
 
-🚀 12. How to Run
+```
+
+## 🚀 12. How to Run
+```text
 1. Clone the repository:
 
 Bash
-git clone [https://github.com/Aryan140314/Multi-Scale-Pathogenic-Gene-and-Risk-Modeling-Using-Machine-Learning-and-Graph-Neural-Networks.git](https://github.com/Aryan140314/Multi-Scale-Pathogenic-Gene-and-Risk-Modeling-Using-Machine-Learning-and-Graph-Neural-Networks.git)
+git clone [https://github.com/Aryan140314/Multi-Scale-Pathogenic-Gene-and-Risk-Modeling-Using-Machine-Learning-
+and-Graph-Neural-Networks.git](https://github.com/Aryan140314/Multi-Scale-Pathogenic-Gene-and-Risk-Modeling-
+Using-Machine-Learning-and-Graph-Neural-Networks.git)
 cd Multi-Scale-Pathogenic-Gene-and-Risk-Modeling-Using-Machine-Learning-and-Graph-Neural-Networks
+
 2. Create a virtual environment and install dependencies:
 
 Bash
 python -m venv .venv
 source .venv/bin/activate  # On Windows use: .venv\Scripts\activate
 pip install -r requirements.txt
+
 3. Set up API Keys:
 Add your Gemini API key to app/.streamlit/secrets.toml to enable the AI Explainer mode.
-
 Ini, TOML
 GEMINI_API_KEY = "your_api_key_here"
-4. Launch the Dashboard:
 
+4. Launch the Dashboard:
 Bash
 cd app
 streamlit run app.py
-📦 13. Requirements
+
+```
+
+## 📦 13. Requirements
+```text
 Python 3.10+
-
 torch, torch_geometric
-
 scikit-learn, xgboost
-
 pandas, numpy
-
 streamlit, plotly, pyvis
-
 shap
-
 google-genai
+Pyorch version: 2.7.1+cu118
+CUDA version used by PyTorch: 11.8
+cuDNN version: 90100
+```
 
-⚠️ 14. Limitations
-Network Dependency: The GNN branch relies heavily on known PPI networks. Genes with missing or incomplete interaction data (orphan nodes) rely predominantly on the ML branch.
-
-Static Snapshot: The predictions are based on a static snapshot of the ClinVar database and require periodic retraining to incorporate newly discovered variants.
-
-🔮 15. Future Enhancements
+## ⚠️ 14. Limitations
+```text
+Network Dependency: The GNN branch relies heavily on known PPI networks. Genes with missing or incomplete
+interaction data (orphan nodes) rely predominantly on the ML branch.Static Snapshot: The predictions are
+based on a static snapshot of the ClinVar database and require periodic retraining to incorporate newly discovered variants.
+```
+## 🔮 15. Future Enhancements
+```text
 Dynamic API Integration: Fetch live variant updates directly from the NCBI E-utilities API.
-
 Cancer-Specific Stratification: Transition from binary (Pathogenic/Benign) to multi-class prediction indicating specific disease or tumor susceptibilities.
-
 3D Protein Structures: Incorporate AlphaFold embeddings to analyze spatial mutation clustering.
+```
 
-📄 16. License
+## 📄 16. License
+```text
 This project is licensed under the MIT License - see the LICENSE file for details.
+```
 
-🙏 17. Acknowledgements
+## 🙏 17. Acknowledgements
+```text
 The developers of PyTorch Geometric and Streamlit for their incredible open-source frameworks.
-
 NCBI and the STRING consortium for providing the foundational biological datasets.
+```
