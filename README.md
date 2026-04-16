@@ -148,6 +148,6 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 🙏 17. Acknowledgements
 ```text
-The developers of PyTorch Geometric and Streamlit for their incredible open-source frameworks.
+The developers of PyTorch & PyTorch Geometric and Streamlit for their incredible open-source frameworks.
 NCBI and the STRING consortium for providing the foundational biological datasets.
 ```
