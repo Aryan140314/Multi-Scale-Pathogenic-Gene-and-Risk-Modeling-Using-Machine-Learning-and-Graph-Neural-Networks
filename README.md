@@ -68,21 +68,23 @@ Based on our robust evaluation suite:
 
 ## 📂 11. Project Structure
 ```text
-├── app/                   # Frontend Application
-│   └── app.py             # Main Streamlit dashboard script
-├── codes/                 # Jupyter Notebooks for the entire pipeline
+├── app/                   # Streamlit dashboard application
+│   ├── app.py             # Main Streamlit UI and inference logic
+│   ├── lib/               # Supporting JS/CSS libraries for web visualization
+│   └── .streamlit/        # Streamlit configuration and secrets
+├── codes/                 # Jupyter Notebooks for data processing and model training
 │   ├── 01_gene_info_processing.ipynb
 │   ├── 02_clinvar_processing.ipynb
 │   ├── ...
-│   ├── 14a_evaluate_tabular_ml.ipynb   # Advanced ML Evaluation Suite
-│   └── 14b_evaluate_tabular_gnn.ipynb  # Advanced GNN Evaluation Suite
+│   ├── 14a_evaluate_tabular_ml.ipynb
+│   └── 14b_evaluate_tabular_gnn.ipynb
 ├── data/
 │   └── processed/         # Cleaned feature matrices and edge lists
-├── models/                # Trained .pkl scalers and .pt model weights
-├── .gitattributes
-├── .gitignore
-└── requirements.txt       # Project dependencies
-
+├── models/                # Trained model weights and serialized learners
+├── images/
+├── requirements.txt       # Python dependencies
+├── index.html             # Project landing page
+└── README.md              # Project documentation
 ```
 
 ## 🚀 12. How to Run
@@ -90,42 +92,41 @@ Based on our robust evaluation suite:
 1. Clone the repository:
 
 Bash
-git clone [https://github.com/Aryan140314/Multi-Scale-Pathogenic-Gene-and-Risk-Modeling-Using-Machine-Learning-
-and-Graph-Neural-Networks.git](https://github.com/Aryan140314/Multi-Scale-Pathogenic-Gene-and-Risk-Modeling-
-Using-Machine-Learning-and-Graph-Neural-Networks.git)
+git clone https://github.com/Aryan140314/Multi-Scale-Pathogenic-Gene-and-Risk-Modeling-Using-Machine-Learning-and-Graph-Neural-Networks.git
 cd Multi-Scale-Pathogenic-Gene-and-Risk-Modeling-Using-Machine-Learning-and-Graph-Neural-Networks
 
 2. Create a virtual environment and install dependencies:
 
 Bash
 python -m venv .venv
-source .venv/bin/activate  # On Windows use: .venv\Scripts\activate
+.venv\Scripts\activate
 pip install -r requirements.txt
 
-3. Set up API Keys:
-Add your Gemini API key to app/.streamlit/secrets.toml to enable the AI Explainer mode.
-Ini, TOML
-GEMINI_API_KEY = "your_api_key_here"
+3. Launch the Streamlit app:
 
-4. Launch the Dashboard:
 Bash
 cd app
 streamlit run app.py
-
 ```
+
+> If you want to enable AI explainability with Gemini/Google GenAI, add your API key to `app/.streamlit/secrets.toml`.
 
 ## 📦 13. Requirements
 ```text
 Python 3.10+
-torch, torch_geometric
-scikit-learn, xgboost
-pandas, numpy
-streamlit, plotly, pyvis
+streamlit
+pandas
+numpy
+scikit-learn
+xgboost
+joblib
+plotly
 shap
-google-genai
-Pyorch version: 2.7.1+cu118
-CUDA version used by PyTorch: 11.8
-cuDNN version: 90100
+pyvis
+torch
+torch_geometric
+scipy
+google-generativeai
 ```
 
 ## ⚠️ 14. Limitations
