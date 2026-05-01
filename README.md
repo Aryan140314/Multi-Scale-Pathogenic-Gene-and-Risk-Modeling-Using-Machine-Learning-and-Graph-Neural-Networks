@@ -102,12 +102,14 @@ python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
 
-3. Launch the Streamlit app:
+4. Launch the Streamlit app:
 
 Bash
 cd app
 streamlit run app.py
 ```
+
+> **Important:** For deployment on Streamlit Cloud, this project requires Python 3.10.11 so that `scikit-learn==1.7.2` matches the saved model pickle versions. The file `runtime.txt` is included in the repo to enforce this version.
 
 > If you want to enable AI explainability with Gemini/Google GenAI, add your API key to `app/.streamlit/secrets.toml`.
 
