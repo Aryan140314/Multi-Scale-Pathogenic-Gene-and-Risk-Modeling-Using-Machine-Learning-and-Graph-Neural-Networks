@@ -262,26 +262,31 @@ def get_scaled_data(_ml_sc, _gnn_sc, _X_ml_raw, _X_gnn_raw):
 # ─────────────────────────────────────────────────────────────────────────────
 # LOAD EVERYTHING
 # ─────────────────────────────────────────────────────────────────────────────
-features_df, edges_df = load_datasets()
-clinvar_df             = load_clinvar()
-gene_info_df           = load_gene_info()
-clinvar_lookup         = build_clinvar_lookup(clinvar_df)
+try:
+    features_df, edges_df = load_datasets()
+    clinvar_df             = load_clinvar()
+    gene_info_df           = load_gene_info()
+    clinvar_lookup         = build_clinvar_lookup(clinvar_df)
 
-X_ml_raw, X_gnn_raw, ml_cols, gnn_cols, gene_list, gene_to_idx, edge_index = build_pipeline(
-    features_df, edges_df
-)
-ml_models, ml_sc, gnn_sc, sage_model, gat_model, missing_files = load_models(
-    gnn_dim=len(gnn_cols)
-)
+    X_ml_raw, X_gnn_raw, ml_cols, gnn_cols, gene_list, gene_to_idx, edge_index = build_pipeline(
+        features_df, edges_df
+    )
+    ml_models, ml_sc, gnn_sc, sage_model, gat_model, missing_files = load_models(
+        gnn_dim=len(gnn_cols)
+    )
 
-# Fetch pre-calculated scaled arrays to fix UI lag
-ml_sc_use, gnn_sc_use, X_ml_scaled_all, X_gnn_scaled_all = get_scaled_data(
-    ml_sc, gnn_sc, X_ml_raw, X_gnn_raw
-)
+    # Fetch pre-calculated scaled arrays to fix UI lag
+    ml_sc_use, gnn_sc_use, X_ml_scaled_all, X_gnn_scaled_all = get_scaled_data(
+        ml_sc, gnn_sc, X_ml_raw, X_gnn_raw
+    )
 
-if missing_files:
-    st.warning("⚠️ Missing model files in `../models/`: " +
-               ", ".join(f"`{f}`" for f in missing_files))
+    if missing_files:
+        st.warning("⚠️ Missing model files in `../models/`: " +
+                   ", ".join(f"`{f}`" for f in missing_files))
+except Exception as e:
+    st.error("🚨 Startup failed while loading data/models. Please check the deployment logs.")
+    st.exception(e)
+    st.stop()
 
 # ─────────────────────────────────────────────────────────────────────────────
 # INFERENCE ENGINE
