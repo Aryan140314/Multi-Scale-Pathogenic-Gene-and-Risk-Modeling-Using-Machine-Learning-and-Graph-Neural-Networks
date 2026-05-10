@@ -1,5 +1,5 @@
 """
-PathoGAT — Advanced Gene Pathogenicity Dashboard  (v3)
+Multi-Scale Pathogenic Gene and Risk Modeling Using ML and GNN Dashboard  (v3)
 =======================================================
 NEW in v3:
   • Gene Description Card  — full NCBI description for every gene
@@ -47,6 +47,8 @@ def safe_transform(scaler, X_numpy):
 # DEVICE
 # ─────────────────────────────────────────────────────────────────────────────
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+APP_TITLE = "Multi-Scale Pathogenic Gene and Risk Modeling Using ML and GNN"
+FOOTER_TITLE = "Multi-Scale Pathogenic Gene and Risk Modeling Using ML and GNNs"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # COLUMN DEFINITIONS
@@ -94,14 +96,64 @@ class GeneGAT(torch.nn.Module):
 # ─────────────────────────────────────────────────────────────────────────────
 # PAGE CONFIG
 # ─────────────────────────────────────────────────────────────────────────────
-st.set_page_config(layout="wide", page_title="PathoGAT AI Dashboard", page_icon="🧬")
+st.set_page_config(layout="wide", page_title=APP_TITLE, page_icon="🧬")
 st.markdown(
-    "<h1 style='margin-bottom:2px'>🧬 PathoGAT: Multi-Scale Gene Pathogenicity Predictor</h1>",
-    unsafe_allow_html=True
-)
-st.markdown(
-    f"<p style='color:grey;margin-top:0'>5-Model ML Ensemble · GraphSAGE · GATv2 · "
-    f"Node2Vec · PPI Network · AI Explainer &nbsp;|&nbsp; Compute: <code>{device}</code></p>",
+    f"""
+    <style>
+    .page-header {{
+        text-align: center;
+        padding: 0.5rem 0 0.15rem;
+        margin-bottom: 0.15rem;
+    }}
+    .page-header h1 {{
+        margin: 0;
+        color: #123524;
+        font-size: 2rem;
+        line-height: 1.25;
+    }}
+    .page-header .subtitle {{
+        margin-top: 0.35rem;
+        color: #6b7280;
+        font-size: 0.98rem;
+    }}
+    .project-footer {{
+        text-align: center;
+        padding: 1.2rem 1rem 1rem;
+        margin-bottom: 0.75rem;
+        border-top: 1px solid #d9e6dc;
+    }}
+    .project-footer .names {{
+        color: #123524;
+        font-size: 1rem;
+        font-weight: 600;
+        line-height: 1.8;
+    }}
+    .project-footer .detail {{
+        margin: 0.3rem 0;
+        color: #2f3e46;
+        font-size: 0.97rem;
+    }}
+    .project-footer .institution {{
+        margin: 0.45rem 0;
+        color: #123524;
+        font-size: 1rem;
+        font-weight: 700;
+    }}
+    .project-footer .meta {{
+        margin-top: 0.75rem;
+        color: #6b7280;
+        font-size: 0.92rem;
+        line-height: 1.6;
+    }}
+    </style>
+    <div class="page-header">
+        <h1>🧬 {APP_TITLE}</h1>
+        <div class="subtitle">
+            5-Model ML Ensemble · GraphSAGE · GATv2 · Node2Vec · PPI Network · AI Explainer
+            &nbsp;|&nbsp; Compute: <code>{device}</code>
+        </div>
+    </div>
+    """,
     unsafe_allow_html=True
 )
 
@@ -390,7 +442,7 @@ c1.metric(f"{risk_icon} Final Consensus", f"{final_prob:.3f}")
 c2.metric("📊 ML Ensemble",               f"{ml_ens:.3f}")
 c3.metric("🕸️ GNN Consensus",            f"{gnn_ens:.3f}")
 c4.metric("🌿 GraphSAGE",                f"{sage_p:.3f}")
-c5.metric("⚡ PathoGAT (GAT)",           f"{gat_p:.3f}")
+c5.metric("⚡ ML and GNN (GAT)",         f"{gat_p:.3f}")
 st.markdown("<hr style='margin:8px 0'>", unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -434,7 +486,7 @@ with tabs[0]:
 
     with col_r:
         st.subheader("📊 Model Comparison")
-        bnames = list(ind_probs.keys()) + ["ML Ens.", "GraphSAGE", "PathoGAT", "GNN Avg", "▶ FINAL"]
+        bnames = list(ind_probs.keys()) + ["ML Ens.", "GraphSAGE", "ML and GNN", "GNN Avg", "▶ FINAL"]
         bprobs = list(ind_probs.values()) + [ml_ens, sage_p, gat_p, gnn_ens, final_prob]
         bcols  = (["#1565C0"] * len(ind_probs) +
                   ["#E65100", "#6A1B9A", "#6A1B9A", "#F9A825",
@@ -541,17 +593,17 @@ with tabs[1]:
             whatif_ctx = "User has modified features:\n" + "\n".join(f"  - {c}" for c in changes)
 
     # Prompt assembly
-    prompt_template = f"""You are a senior computational biologist and genomics expert analysing a gene pathogenicity prediction system called PathoGAT.
+    prompt_template = f"""You are a senior computational biologist and genomics expert analysing a gene pathogenicity prediction system called {APP_TITLE}.
 
 Gene being analysed: {selected_gene}
 Gene description (NCBI): {gene_desc}
 Ground-truth clinical label: {"PATHOGENIC" if gene_label == 1 else "BENIGN"}
 
-PathoGAT Risk Scores:
+{APP_TITLE} Risk Scores:
   - Final Consensus Risk: {final_prob:.3f} ({"HIGH RISK" if final_prob > 0.5 else "LOW RISK"})
   - ML Ensemble: {ml_ens:.3f}
   - GraphSAGE: {sage_p:.3f}
-  - PathoGAT (GAT): {gat_p:.3f}
+  - {APP_TITLE} (GAT): {gat_p:.3f}
   - GNN Average: {gnn_ens:.3f}
 
 Top SHAP feature contributions (XGBoost):
@@ -583,7 +635,7 @@ ClinVar variant data:
 
     mode_instructions = {
         "🔍 Why is this gene flagged as high/low risk?":
-            "Explain in 3–5 paragraphs why PathoGAT gives this gene a risk score of "
+            f"Explain in 3–5 paragraphs why {APP_TITLE} gives this gene a risk score of "
             f"{final_prob:.3f}. Focus on the most important contributing features, "
             "the network neighbourhood, and how they relate to pathogenicity. "
             "Compare to the ground-truth label.",
@@ -1198,14 +1250,21 @@ with tabs[8]:
 # ─────────────────────────────────────────────────────────────────────────────
 st.markdown("<hr style='margin:20px 0 8px'>", unsafe_allow_html=True)
 st.markdown(
-    f"<div style='text-align:center;color:grey;font-size:11px'>"
-    f"PathoGAT v3 &nbsp;·&nbsp; "
+    f"<div class='project-footer'>"
+    f"<div class='names'>Gokul S, Arnab Banerjee, Aryan, Aniket Kumar Rai</div>"
+    f"<div class='detail'><strong>Supervisor:</strong> Dr. Pusphavati T P</div>"
+    f"<div class='institution'>FACULTY OF ENGINEERING AND TECHNOLOGY</div>"
+    f"<div class='institution'>M. S. RAMAIAH UNIVERSITY OF APPLIED SCIENCES</div>"
+    f"<div class='detail'>Bengaluru - 560 054</div>"
+    f"<div class='meta'>"
+    f"{FOOTER_TITLE} &nbsp;·&nbsp; "
     f"ML: RandomForest · XGBoost · GradBoost · SVM · LogReg · Stacking &nbsp;·&nbsp; "
     f"GNN: GraphSAGE · GATv2 &nbsp;·&nbsp; "
     f"Genes: {len(features_df):,} &nbsp;·&nbsp; "
     f"PPI Edges: {len(edges_df):,} &nbsp;·&nbsp; "
     f"ClinVar Variants: {len(clinvar_df):,} &nbsp;·&nbsp; "
     f"Compute: {device}"
+    f"</div>"
     f"</div>",
     unsafe_allow_html=True
 )
