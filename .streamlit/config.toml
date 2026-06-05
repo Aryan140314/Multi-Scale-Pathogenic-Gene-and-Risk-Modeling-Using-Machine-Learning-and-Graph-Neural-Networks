@@ -6,18 +6,13 @@ textColor = "#262730"
 font = "sans serif"
 
 [client]
-showErrorDetails = true
-maxUploadSize = 200
+showErrorDetails = false
 toolbarMode = "viewer"
 
 [server]
 port = 8501
 enableXsrfProtection = true
 headless = true
-maxUploadSize = 200
 
 [logger]
 level = "info"
-
-[client]
-showErrorDetails = false
