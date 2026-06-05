@@ -8,9 +8,8 @@ This file serves as the main entry point for Streamlit Cloud deployment.
 import os
 import sys
 
-# Add the app directory to the path
-app_dir = os.path.join(os.path.dirname(__file__), 'app')
-sys.path.insert(0, app_dir)
+# Ensure we're running from the app directory context
+os.chdir(os.path.dirname(__file__))
 
-# Import the main app
-from app import *  # noqa: F401, F403
+# Import and run the app module
+exec(open(os.path.join(os.path.dirname(__file__), 'app', 'app.py')).read())
