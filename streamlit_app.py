@@ -11,5 +11,6 @@ import sys
 # Ensure we're running from the app directory context
 os.chdir(os.path.dirname(__file__))
 
-# Import and run the app module
-exec(open(os.path.join(os.path.dirname(__file__), 'app', 'app.py')).read())
+# Import and run the app module with proper UTF-8 encoding
+with open(os.path.join(os.path.dirname(__file__), 'app', 'app.py'), 'r', encoding='utf-8') as f:
+    exec(f.read())
