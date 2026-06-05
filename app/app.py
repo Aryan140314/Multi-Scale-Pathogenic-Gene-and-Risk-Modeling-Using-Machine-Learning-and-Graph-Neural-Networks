@@ -148,10 +148,16 @@ st.markdown(
 # ─────────────────────────────────────────────────────────────────────────────
 @st.cache_data
 def load_datasets():
-    base  = os.path.dirname(os.path.abspath(__file__))
-    proc  = os.path.join(base, "..", "data", "processed")
-    feat  = pd.read_csv(os.path.join(proc, "final_gene_features.csv"))
+    base = os.path.dirname(os.path.abspath(__file__))
+    proc = os.path.join(base, "data", "processed")
+
+    feat = pd.read_csv(os.path.join(proc, "final_gene_features.csv"))
     edges = pd.read_csv(os.path.join(proc, "final_edge_list.csv"))
+
+    if "pathogenic" not in feat.columns:
+        feat["pathogenic"] = feat["label"]
+
+    return feat, edges
     if "pathogenic" not in feat.columns:
         feat["pathogenic"] = feat["label"]
     return feat, edges
@@ -159,7 +165,7 @@ def load_datasets():
 @st.cache_data
 def load_clinvar():
     base = os.path.dirname(os.path.abspath(__file__))
-    path = os.path.join(base, "..", "data", "processed", "clinvar_filtered.csv")
+    path = os.path.join(base, "data", "processed", "clinvar_filtered.csv")
     if not os.path.exists(path):
         return pd.DataFrame()
     df = pd.read_csv(path)
@@ -169,7 +175,7 @@ def load_clinvar():
 @st.cache_data
 def load_gene_info():
     base = os.path.dirname(os.path.abspath(__file__))
-    path = os.path.join(base, "..", "data", "processed", "gene_info_filtered.csv")
+    path = os.path.join(base, "data", "processed", "gene_info_filtered.csv")
     if not os.path.exists(path):
         return pd.DataFrame()
     df = pd.read_csv(path)
@@ -208,7 +214,7 @@ def build_clinvar_lookup(_clinvar_df):
 @st.cache_resource
 def load_models(gnn_dim: int):
     base = os.path.dirname(os.path.abspath(__file__))
-    mdir = os.path.join(base, "..", "models")
+    mdir = os.path.join(base, "models")
     mdls, miss = {}, []
 
     for name, fname in {
