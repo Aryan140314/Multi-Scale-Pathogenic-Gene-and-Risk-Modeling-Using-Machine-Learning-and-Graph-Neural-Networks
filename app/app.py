@@ -1,17 +1,3 @@
-"""
-Multi-Scale Pathogenic Gene and Risk Modeling Using ML and GNN Dashboard  (v3)
-=======================================================
-NEW in v3:
-  • Gene Description Card  — full NCBI description for every gene
-  • Variant Breakdown Tab  — per-gene SNV / Deletion / Insertion breakdown
-                             from clinvar_filtered.csv
-  • AI Explainer Mode      — Claude/Gemini API analyses what the risk score means,
-                             what causes the risk, what changing a feature
-                             does biologically, and what the gene does
-  • All sklearn warnings   — suppressed via safe_transform helper
-  • use_container_width    — replaced with width='stretch'
-"""
-
 import os, warnings
 import streamlit as st
 import pandas as pd
@@ -149,7 +135,7 @@ st.markdown(
     <div class="page-header">
         <h1>🧬 {APP_TITLE}</h1>
         <div class="subtitle">
-            5-Model ML Ensemble · GraphSAGE · GATv2 · Node2Vec · PPI Network · AI Explainer
+            5-Model ML Ensemble · GraphSAGE · GATv2 · Node2Vec · PPI Network
             &nbsp;|&nbsp; Compute: <code>{device}</code>
         </div>
     </div>
@@ -446,11 +432,15 @@ c5.metric("⚡ ML and GNN (GAT)",         f"{gat_p:.3f}")
 st.markdown("<hr style='margin:8px 0'>", unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────────────────────────────────────
+# GLOBAL MODEL REFERENCES (needed across multiple tabs)
+# ─────────────────────────────────────────────────────────────────────────────
+xgb_m = ml_models.get("XGBoost")
+
+# ─────────────────────────────────────────────────────────────────────────────
 # TABS
 # ─────────────────────────────────────────────────────────────────────────────
 tabs = st.tabs([
     "📊 Overview",
-    "🤖 AI Explainer",
     "🧬 Gene Profile",
     "🔬 Variant Breakdown",
     "🌐 PPI Network",
@@ -526,196 +516,9 @@ with tabs[0]:
         )
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 1 — AI EXPLAINER
+# TAB 1 — GENE PROFILE
 # ══════════════════════════════════════════════════════════════════════════════
 with tabs[1]:
-    st.subheader("🤖 AI Gene Explainer")
-    st.markdown(
-        "This mode uses the **Anthropic Claude API** to explain your gene's risk score "
-        "in plain language — what the gene does, why it is flagged as high/low risk, "
-        "and what happens when features change."
-    )
-
-    # Collect SHAP values for context
-    shap_context = ""
-    xgb_m = ml_models.get("XGBoost")
-    if xgb_m and hasattr(xgb_m, "predict_proba"):
-        try:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                exp  = shap.TreeExplainer(xgb_m)
-                svs  = exp.shap_values(ml_df_node)
-            sv = svs[1][0] if isinstance(svs, list) else (svs[0] if svs.ndim == 2 else svs)
-            shap_df = (pd.DataFrame({"Feature": ml_cols, "SHAP": sv})
-                       .assign(Abs=lambda d: d.SHAP.abs())
-                       .sort_values("Abs", ascending=False).head(10))
-            lines = []
-            for _, r in shap_df.iterrows():
-                direction = "↑ increases" if r.SHAP > 0 else "↓ decreases"
-                lines.append(f"  - {r.Feature} = {float(gene_row.get(r.Feature, 0)):.4f} "
-                             f"({direction} pathogenicity risk by {abs(r.SHAP):.4f})")
-            shap_context = "\n".join(lines)
-        except Exception:
-            shap_context = "  (SHAP not available)"
-
-    # Neighbour context
-    local_e = edges_df[
-        (edges_df["gene1"] == selected_gene) | (edges_df["gene2"] == selected_gene)
-    ].head(50)
-    nbr_genes  = (set(local_e["gene1"]) | set(local_e["gene2"])) - {selected_gene}
-    nbr_sub    = features_df[features_df["GeneSymbol"].isin(nbr_genes)]
-    n_path_nbr = int((nbr_sub["label"] == 1).sum()) if len(nbr_sub) > 0 else 0
-
-    # clinvar context
-    cl_row = (clinvar_lookup[clinvar_lookup["GeneSymbol"] == selected_gene].iloc[0]
-              if not clinvar_lookup.empty and selected_gene in clinvar_lookup["GeneSymbol"].values
-              else None)
-    clinvar_ctx = ""
-    if cl_row is not None:
-        clinvar_ctx = (
-            f"ClinVar records for this gene: {int(cl_row['total_variants'])} total variants "
-            f"({int(cl_row['pathogenic'])} pathogenic, {int(cl_row['likely_pathogenic'])} likely pathogenic, "
-            f"{int(cl_row['benign'])} benign). "
-            f"Variant types: {int(cl_row['snv'])} SNVs, {int(cl_row['deletion'])} deletions, "
-            f"{int(cl_row['insertion'])} insertions."
-        )
-
-    # What-if context
-    whatif_ctx = ""
-    if user_inputs:
-        changes = []
-        for f, v in user_inputs.items():
-            orig = float(gene_row.get(f, 0))
-            delta = v - orig
-            if abs(delta) > 1e-6:
-                changes.append(f"{f}: {orig:.2f} → {v:.2f} (change: {delta:+.2f})")
-        if changes:
-            whatif_ctx = "User has modified features:\n" + "\n".join(f"  - {c}" for c in changes)
-
-    # Prompt assembly
-    prompt_template = f"""You are a senior computational biologist and genomics expert analysing a gene pathogenicity prediction system called {APP_TITLE}.
-
-Gene being analysed: {selected_gene}
-Gene description (NCBI): {gene_desc}
-Ground-truth clinical label: {"PATHOGENIC" if gene_label == 1 else "BENIGN"}
-
-{APP_TITLE} Risk Scores:
-  - Final Consensus Risk: {final_prob:.3f} ({"HIGH RISK" if final_prob > 0.5 else "LOW RISK"})
-  - ML Ensemble: {ml_ens:.3f}
-  - GraphSAGE: {sage_p:.3f}
-  - {APP_TITLE} (GAT): {gat_p:.3f}
-  - GNN Average: {gnn_ens:.3f}
-
-Top SHAP feature contributions (XGBoost):
-{shap_context}
-
-Protein-protein interaction context:
-  - {selected_gene} has {len(nbr_genes)} direct PPI neighbours
-  - {n_path_nbr} of those neighbours are labelled Pathogenic
-
-ClinVar variant data:
-  {clinvar_ctx}
-
-{whatif_ctx}
-"""
-
-    explain_mode = st.selectbox(
-        "What do you want explained?",
-        [
-            "🔍 Why is this gene flagged as high/low risk?",
-            "🧬 What does this gene do biologically?",
-            "📊 What do the SHAP features mean for this gene?",
-            "🔄 What happens biologically when I change the selected features?",
-            "🌐 What does the gene's network neighbourhood tell us?",
-            "⚗️ What are the clinical implications of this risk score?",
-            "📝 Full Summary Report",
-        ],
-        key="explain_mode"
-    )
-
-    mode_instructions = {
-        "🔍 Why is this gene flagged as high/low risk?":
-            f"Explain in 3–5 paragraphs why {APP_TITLE} gives this gene a risk score of "
-            f"{final_prob:.3f}. Focus on the most important contributing features, "
-            "the network neighbourhood, and how they relate to pathogenicity. "
-            "Compare to the ground-truth label.",
-
-        "🧬 What does this gene do biologically?":
-            f"Based on the gene description '{gene_desc}', explain in clear language "
-            f"what {selected_gene} does in the human body. Describe its biological pathway, "
-            "known disease associations, and why mutations in this gene can cause disease.",
-
-        "📊 What do the SHAP features mean for this gene?":
-            "Explain what each top SHAP feature means biologically for this gene. "
-            "For each feature, explain: what it measures, why it drives the score up or down, "
-            "and what a researcher should pay attention to.",
-
-        "🔄 What happens biologically when I change the selected features?":
-            f"The user has modified gene features. {whatif_ctx if whatif_ctx else 'No features changed yet — explain what each editable feature represents biologically.'} "
-            "Explain what each change means biologically: why increasing/decreasing this feature "
-            "would affect pathogenicity, what cellular processes are involved.",
-
-        "🌐 What does the gene's network neighbourhood tell us?":
-            f"{selected_gene} has {len(nbr_genes)} PPI neighbours of which {n_path_nbr} are pathogenic. "
-            "Explain the 'guilt by association' principle in genomics. What does it mean when a gene "
-            "is highly connected to pathogenic genes? How does the GNN use this to compute risk?",
-
-        "⚗️ What are the clinical implications of this risk score?":
-            f"Risk score: {final_prob:.3f}. Ground truth: {'Pathogenic' if gene_label==1 else 'Benign'}. "
-            "Explain the clinical implications of this score. What should a clinician do with this information? "
-            "What are the limitations? How should this AI prediction be used alongside traditional diagnostics?",
-
-        "📝 Full Summary Report":
-            f"Write a comprehensive 6-section genomics report about {selected_gene}: "
-            "(1) Gene function and biology, (2) Risk assessment rationale, "
-            "(3) Key driving features, (4) Network context, "
-            "(5) ClinVar variant landscape, (6) Clinical implications and caveats. "
-            "Use professional but accessible language suitable for a clinical researcher.",
-    }
-
-    if st.button("🚀 Generate AI Explanation", type="primary", key="ai_btn"):
-        full_prompt = prompt_template + "\n\nTask:\n" + mode_instructions[explain_mode]
-
-        try:
-            import google.generativeai as genai
-            import os
-            
-            # Retrieve API key securely from Streamlit secrets or environment
-            api_key = st.secrets.get("GEMINI_API_KEY", os.environ.get("GEMINI_API_KEY"))
-            
-            if not api_key:
-                st.error("⚠️ Gemini API Key missing! Please add GEMINI_API_KEY to `.streamlit/secrets.toml`")
-            else:
-                genai.configure(api_key=api_key)
-                # Using Gemini 1.5 Pro for advanced biological reasoning
-                model = genai.GenerativeModel('gemini-2.5-flash')
-                
-                with st.spinner("Gemini is analysing your gene..."):
-                    response = model.generate_content(full_prompt)
-                    explanation = response.text
-                
-                st.markdown(
-                    f"<div style='background:#0d1b2a;border:1px solid #1e3a5f;border-radius:10px;"
-                    f"padding:20px;line-height:1.7;color:#e0e0e0'>{explanation}</div>",
-                    unsafe_allow_html=True
-                )
-        except ImportError:
-            st.error("Install the Google Generative AI SDK: `pip install google-generativeai`")
-        except Exception as e:
-            st.error(f"API error: {e}")
-            # Fallback: show the rich prompt so user can paste it manually
-            with st.expander("📋 Copy this prompt to any AI chatbot"):
-                st.text_area("Prompt", full_prompt + "\n\nTask:\n" + mode_instructions[explain_mode],
-                             height=300, key="prompt_copy")
-
-    # Always show the context being used
-    with st.expander("📋 See the full context sent to AI"):
-        st.text(prompt_template)
-
-# ══════════════════════════════════════════════════════════════════════════════
-# TAB 2 — GENE PROFILE
-# ══════════════════════════════════════════════════════════════════════════════
-with tabs[2]:
     st.subheader(f"🧬 Gene Profile: {selected_gene}")
 
     # Description card
@@ -799,9 +602,9 @@ with tabs[2]:
         st.dataframe(sim_df.drop(columns=["label"]), width="stretch", hide_index=True)
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 3 — VARIANT BREAKDOWN
+# TAB 2 — VARIANT BREAKDOWN
 # ══════════════════════════════════════════════════════════════════════════════
-with tabs[3]:
+with tabs[2]:
     st.subheader(f"🔬 ClinVar Variant Breakdown: {selected_gene}")
 
     if not clinvar_lookup.empty and selected_gene in clinvar_lookup["GeneSymbol"].values:
@@ -899,9 +702,9 @@ with tabs[3]:
             st.warning("clinvar_filtered.csv not found at `../data/processed/clinvar_filtered.csv`.")
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 4 — PPI NETWORK
+# TAB 3 — PPI NETWORK
 # ══════════════════════════════════════════════════════════════════════════════
-with tabs[4]:
+with tabs[3]:
     st.subheader("🌐 Protein-Protein Interaction Network")
     nc1, nc2, nc3, nc4 = st.columns(4)
     ppi_theme   = nc1.radio("Theme",    ["Dark", "Light"], horizontal=True, key="ppi_t")
@@ -1003,9 +806,9 @@ with tabs[4]:
         st.info(f"No PPI interactions found for **{selected_gene}**.")
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 5 — EXPLAINABILITY
+# TAB 4 — EXPLAINABILITY
 # ══════════════════════════════════════════════════════════════════════════════
-with tabs[5]:
+with tabs[4]:
     st.subheader("🧠 SHAP Feature Importance (XGBoost)")
     if xgb_m and hasattr(xgb_m, "predict_proba"):
         try:
@@ -1073,9 +876,9 @@ with tabs[5]:
         st.plotly_chart(fig_sv, width="stretch")
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 6 — EMBEDDING SPACE
+# TAB 5 — EMBEDDING SPACE
 # ══════════════════════════════════════════════════════════════════════════════
-with tabs[6]:
+with tabs[5]:
     emb_cols = [c for c in gnn_cols if c.startswith("node2vec_")]
     if len(emb_cols) >= 2:
         ec1, ec2 = st.columns([3, 1])
@@ -1118,9 +921,9 @@ with tabs[6]:
         st.info("Node2Vec columns not found.")
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 7 — NETWORK TOPOLOGY
+# TAB 6 — NETWORK TOPOLOGY
 # ══════════════════════════════════════════════════════════════════════════════
-with tabs[7]:
+with tabs[6]:
     topo_f = [c for c in ["gene_degree","clustering_coefficient","pagerank",
                            "betweenness_centrality"] if c in features_df.columns]
     if topo_f:
@@ -1183,9 +986,9 @@ with tabs[7]:
         st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
 
 # ══════════════════════════════════════════════════════════════════════════════
-# TAB 8 — GENE COMPARISON
+# TAB 7 — GENE COMPARISON
 # ══════════════════════════════════════════════════════════════════════════════
-with tabs[8]:
+with tabs[7]:
     st.subheader("⚖️ Side-by-Side Gene Comparison")
     cg    = st.selectbox("Compare with:", [g for g in sorted(gene_list) if g != selected_gene],
                          key="cmp_g")
